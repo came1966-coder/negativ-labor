@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Negativ-Labor</title>
+<meta name="theme-color" content="#1c1a18">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+/* Layout: eine Spalte, Bild oben, Werkzeuge darunter – bewusst dunkel und farbneutral,
+   damit das Auge die Farben des Bildes nicht verfälscht beurteilt. */
+:root {
+  --bg: #1c1a18;        /* Dunkelkammer, leicht warm */
+  --panel: #262320;
+  --line: #3a3530;
+  --fg: #ece6dc;
+  --muted: #a39a8e;
+  --accent: #e58a3a;    /* Orange der Filmmaske */
+  --accent-ink: #1c1a18;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "Roboto Mono", Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--font); }
+body {
+  min-height: 100vh;
+  padding: env(safe-area-inset-top, 0px) max(16px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(16px, env(safe-area-inset-left, 0px));
+}
+main { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; padding-block: 16px 32px; }
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+h1 { font-size: 1.35rem; margin: 0; letter-spacing: .01em; }
+h1 span { color: var(--accent); }
+.sub { color: var(--muted); font-size: .85rem; }
+h2 { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+
+button, .btn {
+  font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; padding: 11px 14px; cursor: pointer; display: inline-flex; align-items: center;
+  justify-content: center; gap: 8px; min-height: 46px; text-align: center;
+}
+button:focus-visible, .btn:focus-within, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary, .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+.btn input[type=file] { display: none; }
+
+.row { display: flex; flex-wrap: wrap; gap: 8px; }
+.row > * { flex: 1 1 0; min-width: 0; }
+
+/* Startseite */
+#start { display: flex; flex-direction: column; gap: 16px; }
+.pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pick .btn { min-height: 92px; flex-direction: column; font-size: 1rem; }
+.pick svg { width: 28px; height: 28px; }
+.tips { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.tips ol { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; }
+.tips li::marker { color: var(--accent); font-weight: 600; }
+
+/* Arbeitsfläche */
+#work { display: flex; flex-direction: column; gap: 14px; }
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.tabs button { border: 0; border-radius: 0; background: transparent; min-height: 42px; }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.stage { position: relative; background: #0d0c0b; border-radius: 12px; overflow: hidden; display: flex; justify-content: center; align-items: center; min-height: 200px; }
+.stage canvas { display: block; max-width: 100%; max-height: 62vh; touch-action: none; }
+.hint { color: var(--muted); font-size: .85rem; margin: 0; }
+.hint b { color: var(--fg); font-weight: 600; }
+.busy { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(13,12,11,.6); font-size: .9rem; }
+
+.controls { display: flex; flex-direction: column; gap: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.slider { display: grid; grid-template-columns: 7.5em 1fr 3em; align-items: center; gap: 10px; }
+.slider label { font-size: .9rem; }
+.slider output { font: .8rem var(--mono); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
+.small { font-size: .85rem; min-height: 40px; padding: 8px 10px; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: .9rem; max-width: calc(100% - 32px); }
+@media (prefers-reduced-motion: no-preference) { .toast { transition: opacity .3s; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Negativ<span>-</span>Labor</h1>
+    <span class="sub">offline · ohne Abo</span>
+  </header>
+
+  <section id="start">
+    <div class="pick">
+      <label class="btn primary" for="camIn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h3l2-3h6l2 3h3v13H4z"/><circle cx="12" cy="13" r="4"/></svg>
+        Negativ fotografieren
+        <input id="camIn" type="file" accept="image/*" capture="environment">
+      </label>
+      <label class="btn" for="fileIn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/></svg>
+        Foto aus Galerie
+        <input id="fileIn" type="file" accept="image/*">
+      </label>
+    </div>
+    <div class="tips">
+      <h2>So gelingen die Aufnahmen</h2>
+      <ol>
+        <li>Negativ auf einen <b>leuchtenden</b> weißen Bildschirm legen (Tablet oder Laptop, Helligkeit ganz hoch). Papier von oben beleuchtet reicht nicht.</li>
+        <li>Raumlicht möglichst aus, damit nichts von oben spiegelt.</li>
+        <li>Handy genau parallel halten, das Bild füllen, scharfstellen durch Tippen.</li>
+        <li>Blitz aus. Sauberes Negativ: Staub vorher wegpusten.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="work" hidden>
+    <div class="tabs" role="tablist">
+      <button id="tabCrop" role="tab" aria-selected="true">1 · Ausschnitt</button>
+      <button id="tabPos" role="tab" aria-selected="false">2 · Positiv</button>
+    </div>
+
+    <div class="stage">
+      <canvas id="view"></canvas>
+      <div class="busy" id="busy" hidden>Rechne …</div>
+    </div>
+    <p class="hint" id="hint"></p>
+
+    <div class="row" id="cropTools">
+      <button id="rotBtn" class="small">↻ Drehen</button>
+      <button id="mirBtn" class="small" aria-pressed="false">⇋ Spiegeln</button>
+      <button id="fullBtn" class="small">Ganzes Bild</button>
+    </div>
+
+    <div id="posTools" hidden>
+      <div class="controls">
+        <div class="row">
+          <button id="modeColor" class="small" aria-pressed="true">Farbnegativ</button>
+          <button id="modeBW" class="small" aria-pressed="false">Schwarzweiß</button>
+          <button id="wbBtn" class="small" aria-pressed="false">Grau antippen</button>
+        </div>
+        <div class="slider"><label for="sBright">Helligkeit</label><input id="sBright" type="range" min="-100" max="100" value="0"><output for="sBright">0</output></div>
+        <div class="slider"><label for="sContrast">Kontrast</label><input id="sContrast" type="range" min="-100" max="100" value="0"><output for="sContrast">0</output></div>
+        <div class="slider"><label for="sWarm">Wärme</label><input id="sWarm" type="range" min="-100" max="100" value="0"><output for="sWarm">0</output></div>
+        <div class="slider"><label for="sTint">Grün ↔ Magenta</label><input id="sTint" type="range" min="-100" max="100" value="0"><output for="sTint">0</output></div>
+        <div class="slider"><label for="sSat">Sättigung</label><input id="sSat" type="range" min="0" max="200" value="85"><output for="sSat">85</output></div>
+        <button id="resetBtn" class="small">Regler zurücksetzen</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <button id="newBtn">Neues Bild</button>
+      <button id="shareBtn">Teilen</button>
+      <button id="saveBtn" class="primary">Speichern</button>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const view = $('view'), vctx = view.getContext('2d', { willReadFrequently: true });
+
+const PREVIEW_MAX = 1600;   // Kantenlänge der Vorschau
+const SAVE_MAX = 4000;      // Kantenlänge der gespeicherten Datei
+const DEFAULTS = { bright: 0, contrast: 0, warm: 0, tint: 0, sat: 85 };
+
+const S = {
+  img: null, name: 'negativ',
+  rot: 0, mirror: false,
+  crop: { x: .05, y: .05, w: .9, h: .9 },   // relativ zum gedrehten Bild
+  tab: 'crop', bw: false, wb: [0, 0, 0], wbPick: false,
+  p: { ...DEFAULTS },
+  input: null,      // ImageData des Ausschnitts (Vorschaugröße)
+  stats: null,      // Auto-Grenzen pro Kanal
+  negView: null,    // Canvas der Negativ-Ansicht
+};
+
+// ---------- Farbmathematik ----------
+// Dichte je 8-Bit-Wert: D = -log10(linear). Lichtdurchlässig = geringe Dichte.
+const DENS = new Float32Array(256);
+for (let v = 0; v < 256; v++) {
+  const s = v / 255, lin = s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  DENS[v] = -Math.log10(Math.max(lin, 1e-4));
+}
+
+// Auto-Grenzen: 0,5 %- und 99,5 %-Perzentil pro Kanal, ohne die Randzone des Ausschnitts.
+function analyse(id, bw) {
+  const { data, width: w, height: h } = id;
+  const hist = [new Uint32Array(256), new Uint32Array(256), new Uint32Array(256)];
+  const mx = Math.floor(w * .03), my = Math.floor(h * .03);
+  let n = 0;
+  for (let y = my; y < h - my; y += 2) {
+    for (let x = mx; x < w - mx; x += 2) {
+      const i = (y * w + x) * 4;
+      if (bw) { const g = Math.round((data[i] + data[i + 1] + data[i + 2]) / 3); hist[0][g]++; }
+      else { hist[0][data[i]]++; hist[1][data[i + 1]]++; hist[2][data[i + 2]]++; }
+      n++;
+    }
+  }
+  const pct = (hst, q) => { let acc = 0, lim = n * q; for (let v = 0; v < 256; v++) { acc += hst[v]; if (acc >= lim) return v; } return 255; };
+  return (bw ? [0] : [0, 1, 2]).map(c => {
+    const vLo = pct(hist[c], .005), vHi = pct(hist[c], .995);
+    // hoher Eingangswert = dünnes Negativ = dunkle Bildstelle
+    return { dLo: DENS[vHi], dHi: DENS[Math.max(0, Math.min(vLo, vHi - 1))] };
+  });
+}
+
+// Wert t (0..1, vor Weißabgleich) für Kanal c und Eingangswert v
+function baseT(st, v) { return (DENS[v] - st.dLo) / Math.max(1e-3, st.dHi - st.dLo); }
+
+function buildLuts(stats, p, wb, bw) {
+  const gamma = Math.pow(2, p.bright / 70);
+  const k = Math.pow(2, p.contrast / 60);
+  const bal = bw ? [0, 0, 0] : [p.warm * .0012 + p.tint * .0006, -p.tint * .0012, -p.warm * .0012 + p.tint * .0006];
+  const luts = [];
+  for (let c = 0; c < (bw ? 1 : 3); c++) {
+    const lut = new Uint8ClampedArray(256), st = stats[c];
+    for (let v = 0; v < 256; v++) {
+      let t = baseT(st, v) + (bw ? 0 : wb[c]) + bal[c];
+      t = Math.min(1, Math.max(0, t));
+      t = Math.pow(t, 1 / gamma);
+      t = (t - .5) * k + .5;
+      lut[v] = Math.round(Math.min(1, Math.max(0, t)) * 255);
+    }
+    luts.push(lut);
+  }
+  return luts;
+}
+
+function develop(src, stats, p, wb, bw) {
+  const out = new ImageData(src.width, src.height);
+  const a = src.data, o = out.data, luts = buildLuts(stats, p, wb, bw);
+  const sat = p.sat / 100;
+  if (bw) {
+    const L = luts[0];
+    for (let i = 0; i < a.length; i += 4) {
+      const g = L[(a[i] + a[i + 1] + a[i + 2]) / 3 | 0];
+      o[i] = o[i + 1] = o[i + 2] = g; o[i + 3] = 255;
+    }
+  } else {
+    const [R, G, B] = luts;
+    for (let i = 0; i < a.length; i += 4) {
+      const r = R[a[i]], g = G[a[i + 1]], b = B[a[i + 2]];
+      const y = .299 * r + .587 * g + .114 * b;
+      o[i] = y + (r - y) * sat; o[i + 1] = y + (g - y) * sat; o[i + 2] = y + (b - y) * sat; o[i + 3] = 255;
+    }
+  }
+  return out;
+}
+
+// ---------- Geometrie ----------
+function orientedSize() {
+  const w = S.img.naturalWidth, h = S.img.naturalHeight;
+  return S.rot % 2 ? [h, w] : [w, h];
+}
+// Zeichnet den Ausschnitt (relativ) des gedrehten/gespiegelten Bildes in eine Zielgröße.
+function renderRegion(rel, maxSide) {
+  const [OW, OH] = orientedSize();
+  const rx = rel.x * OW, ry = rel.y * OH, rw = rel.w * OW, rh = rel.h * OH;
+  const s = Math.min(1, maxSide / Math.max(rw, rh));
+  const cv = document.createElement('canvas');
+  cv.width = Math.max(1, Math.round(rw * s)); cv.height = Math.max(1, Math.round(rh * s));
+  const c = cv.getContext('2d', { willReadFrequently: true });
+  c.imageSmoothingQuality = 'high';
+  c.scale(s, s);
+  c.translate(-rx, -ry);
+  if (S.mirror) { c.translate(OW, 0); c.scale(-1, 1); }
+  if (S.rot === 1) { c.translate(OW, 0); c.rotate(Math.PI / 2); }
+  else if (S.rot === 2) { c.translate(OW, OH); c.rotate(Math.PI); }
+  else if (S.rot === 3) { c.translate(0, OH); c.rotate(-Math.PI / 2); }
+  c.drawImage(S.img, 0, 0);
+  return cv;
+}
+
+// ---------- Ansicht: Ausschnitt ----------
+function showCrop() {
+  S.negView = renderRegion({ x: 0, y: 0, w: 1, h: 1 }, PREVIEW_MAX);
+  view.width = S.negView.width; view.height = S.negView.height;
+  drawCrop();
+  $('hint').innerHTML = 'Rahmen auf <b>ein Bild</b> ziehen, ohne Filmrand und Perforation. Ecken verschieben oder innen greifen zum Bewegen. Zahlen am Rand spiegelverkehrt? Dann <b>Spiegeln</b>.';
+}
+function drawCrop() {
+  const W = view.width, H = view.height, c = S.crop;
+  vctx.drawImage(S.negView, 0, 0);
+  vctx.fillStyle = 'rgba(0,0,0,.55)';
+  vctx.beginPath(); vctx.rect(0, 0, W, H);
+  vctx.rect(c.x * W, c.y * H, c.w * W, c.h * H);
+  vctx.fill('evenodd');
+  const lw = Math.max(2, W / 300);
+  vctx.strokeStyle = '#e58a3a'; vctx.lineWidth = lw;
+  vctx.strokeRect(c.x * W, c.y * H, c.w * W, c.h * H);
+  const r = Math.max(8, W / 60);
+  vctx.fillStyle = '#e58a3a';
+  for (const [px, py] of corners()) vctx.fillRect(px * W - r / 2, py * H - r / 2, r, r);
+}
+function corners() { const c = S.crop; return [[c.x, c.y], [c.x + c.w, c.y], [c.x, c.y + c.h], [c.x + c.w, c.y + c.h]]; }
+
+let drag = null;
+function relPoint(e) {
+  const b = view.getBoundingClientRect();
+  return [Math.min(1, Math.max(0, (e.clientX - b.left) / b.width)), Math.min(1, Math.max(0, (e.clientY - b.top) / b.height))];
+}
+view.addEventListener('pointerdown', e => {
+  if (!S.img) return;
+  const [x, y] = relPoint(e);
+  if (S.tab === 'pos') { if (S.wbPick) pickGrey(x, y); return; }
+  view.setPointerCapture(e.pointerId);
+  const b = view.getBoundingClientRect(), tolX = 28 / b.width, tolY = 28 / b.height;
+  const ci = corners().findIndex(([px, py]) => Math.abs(px - x) < tolX && Math.abs(py - y) < tolY);
+  const c = S.crop;
+  if (ci >= 0) {
+    const opp = corners()[3 - ci];
+    drag = { mode: 'corner', ax: opp[0], ay: opp[1] };
+  } else if (x > c.x && x < c.x + c.w && y > c.y && y < c.y + c.h) {
+    drag = { mode: 'move', dx: x - c.x, dy: y - c.y };
+  } else {
+    drag = { mode: 'corner', ax: x, ay: y };
+  }
+});
+view.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const [x, y] = relPoint(e), c = S.crop;
+  if (drag.mode === 'move') {
+    c.x = Math.min(1 - c.w, Math.max(0, x - drag.dx));
+    c.y = Math.min(1 - c.h, Math.max(0, y - drag.dy));
+  } else {
+    c.x = Math.min(x, drag.ax); c.y = Math.min(y, drag.ay);
+    c.w = Math.max(.02, Math.abs(x - drag.ax)); c.h = Math.max(.02, Math.abs(y - drag.ay));
+    c.w = Math.min(c.w, 1 - c.x); c.h = Math.min(c.h, 1 - c.y);
+  }
+  drawCrop();
+});
+const endDrag = () => { if (drag) { drag = null; S.input = null; } };
+view.addEventListener('pointerup', endDrag);
+view.addEventListener('pointercancel', endDrag);
+
+// ---------- Ansicht: Positiv ----------
+function prepareInput() {
+  const cv = renderRegion(S.crop, PREVIEW_MAX);
+  S.input = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height);
+  S.stats = analyse(S.input, S.bw);
+}
+function showPositive() {
+  if (!S.input) prepareInput();
+  view.width = S.input.width; view.height = S.input.height;
+  vctx.putImageData(develop(S.input, S.stats, S.p, S.wb, S.bw), 0, 0);
+  $('hint').innerHTML = S.wbPick
+    ? 'Jetzt auf eine Stelle tippen, die <b>weiß oder grau</b> sein sollte (Wand, Hemd, Wolke).'
+    : 'Farben passen nicht? <b>Grau antippen</b> und eine neutrale Stelle wählen, danach mit den Reglern feinstellen.';
+}
+function pickGrey(x, y) {
+  const { data, width: w, height: h } = S.input;
+  const cx = Math.round(x * (w - 1)), cy = Math.round(y * (h - 1)), r = Math.max(2, Math.round(w / 200));
+  const sum = [0, 0, 0]; let n = 0;
+  for (let yy = Math.max(0, cy - r); yy <= Math.min(h - 1, cy + r); yy++)
+    for (let xx = Math.max(0, cx - r); xx <= Math.min(w - 1, cx + r); xx++) {
+      const i = (yy * w + xx) * 4;
+      for (let c = 0; c < 3; c++) sum[c] += baseT(S.stats[c], data[i + c]);
+      n++;
+    }
+  const t = sum.map(v => v / n), m = (t[0] + t[1] + t[2]) / 3;
+  S.wb = t.map(v => m - v);
+  setSlider('sWarm', 0); setSlider('sTint', 0);
+  S.wbPick = false; $('wbBtn').setAttribute('aria-pressed', 'false');
+  showPositive();
+  toast('Weißabgleich gesetzt');
+}
+
+// ---------- Bedienung ----------
+function setTab(t) {
+  S.tab = t;
+  $('tabCrop').setAttribute('aria-selected', t === 'crop');
+  $('tabPos').setAttribute('aria-selected', t === 'pos');
+  $('cropTools').hidden = t !== 'crop';
+  $('posTools').hidden = t !== 'pos';
+  busy(() => t === 'crop' ? showCrop() : showPositive());
+}
+function busy(fn) {
+  $('busy').hidden = false;
+  setTimeout(() => { try { fn(); } finally { $('busy').hidden = true; } }, 20);
+}
+function toast(msg) {
+  const el = $('toast'); el.textContent = msg; el.hidden = false;
+  clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, 2600);
+}
+function setSlider(id, v) {
+  const el = $(id); el.value = v; el.nextElementSibling.value = v;
+  S.p[{ sBright: 'bright', sContrast: 'contrast', sWarm: 'warm', sTint: 'tint', sSat: 'sat' }[id]] = v;
+}
+
+function loadFile(file) {
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    S.img = img; S.name = (file.name || 'negativ').replace(/\.[^.]+$/, '');
+    S.rot = 0; S.mirror = false; S.wb = [0, 0, 0]; S.input = null;
+    S.crop = { x: .05, y: .05, w: .9, h: .9 };
+    $('mirBtn').setAttribute('aria-pressed', 'false');
+    $('start').hidden = true; $('work').hidden = false;
+    setTab('crop');
+  };
+  img.onerror = () => toast('Dieses Bild lässt sich nicht öffnen. Bitte ein JPG oder PNG wählen.');
+  img.src = url;
+}
+$('camIn').addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value = ''; });
+$('fileIn').addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value = ''; });
+
+$('tabCrop').onclick = () => setTab('crop');
+$('tabPos').onclick = () => setTab('pos');
+$('rotBtn').onclick = () => {
+  // Ausschnitt mitdrehen (90° im Uhrzeigersinn)
+  const c = S.crop; S.crop = { x: 1 - c.y - c.h, y: c.x, w: c.h, h: c.w };
+  S.rot = (S.rot + 1) % 4; S.input = null; busy(showCrop);
+};
+$('mirBtn').onclick = () => {
+  S.mirror = !S.mirror; S.crop.x = 1 - S.crop.x - S.crop.w; S.input = null;
+  $('mirBtn').setAttribute('aria-pressed', S.mirror); busy(showCrop);
+};
+$('fullBtn').onclick = () => { S.crop = { x: 0, y: 0, w: 1, h: 1 }; S.input = null; drawCrop(); };
+
+function setMode(bw) {
+  S.bw = bw; S.input = null; S.wb = [0, 0, 0];
+  $('modeColor').setAttribute('aria-pressed', !bw); $('modeBW').setAttribute('aria-pressed', bw);
+  busy(showPositive);
+}
+$('modeColor').onclick = () => setMode(false);
+$('modeBW').onclick = () => setMode(true);
+$('wbBtn').onclick = () => {
+  if (S.bw) { toast('Im Schwarzweiß-Modus nicht nötig'); return; }
+  S.wbPick = !S.wbPick; $('wbBtn').setAttribute('aria-pressed', S.wbPick); showPositive();
+};
+let raf = 0;
+for (const id of ['sBright', 'sContrast', 'sWarm', 'sTint', 'sSat']) {
+  $(id).addEventListener('input', e => {
+    setSlider(id, +e.target.value);
+    cancelAnimationFrame(raf); raf = requestAnimationFrame(showPositive);
+  });
+}
+$('resetBtn').onclick = () => {
+  for (const [id, k] of [['sBright', 'bright'], ['sContrast', 'contrast'], ['sWarm', 'warm'], ['sTint', 'tint'], ['sSat', 'sat']]) setSlider(id, DEFAULTS[k]);
+  S.wb = [0, 0, 0]; showPositive();
+};
+$('newBtn').onclick = () => { S.img = null; $('work').hidden = true; $('start').hidden = false; };
+
+$('saveBtn').onclick = () => exportImage(false);
+$('shareBtn').onclick = () => exportImage(true);
+const exportImage = share => busy(async () => {
+  if (!S.input) prepareInput();
+  // volle Auflösung, aber mit denselben Auto-Grenzen wie die Vorschau
+  const cv = renderRegion(S.crop, SAVE_MAX), c = cv.getContext('2d');
+  c.putImageData(develop(c.getImageData(0, 0, cv.width, cv.height), S.stats, S.p, S.wb, S.bw), 0, 0);
+  const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', .92));
+  const d = new Date(), pad = n => String(n).padStart(2, '0');
+  const fname = `positiv_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.jpg`;
+  if (share) {
+    const file = new File([blob], fname, { type: 'image/jpeg' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); } catch (err) { /* abgebrochen */ }
+      return;
+    }
+    toast('Teilen geht hier nicht – das Bild wird stattdessen gespeichert');
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = fname; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  toast('Gespeichert: ' + fname + ' (Ordner Downloads)');
+});
+
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
