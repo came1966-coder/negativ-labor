@@ -453,6 +453,13 @@ const exportImage = share => busy(async () => {
   const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', .92));
   const d = new Date(), pad = n => String(n).padStart(2, '0');
   const fname = `positiv_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.jpg`;
+  if (window.Android) {
+    // Android-App: Speichern und Teilen übernimmt die App selbst
+    const b64 = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result.split(',')[1]); fr.readAsDataURL(blob); });
+    const res = window.Android.saveImage(b64, fname, share);
+    toast(res === 'ok' ? 'Gespeichert in Bilder › NegativLabor' : 'Speichern fehlgeschlagen: ' + res);
+    return;
+  }
   if (share) {
     const file = new File([blob], fname, { type: 'image/jpeg' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {

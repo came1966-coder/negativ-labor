@@ -1,5 +1,5 @@
 // Offline-Cache: Die App lädt nach der ersten Installation alles aus dem Speicher des Handys.
-const CACHE = 'negativ-labor-v1';
+const CACHE = 'negativ-labor-v2';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
